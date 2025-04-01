@@ -122,3 +122,14 @@ def display_cpu_info_and_status(args: argparse.Namespace):
 
 
     print("\n--- TÌNH TRẠNG HỆ THỐNG & CPU ---")
+    load_avg = get_system_load()
+    if load_avg:
+        print(f"Tải trung bình (1m, 5m, 15m): {load_avg[0]:.2f}, {load_avg[1]:.2f}, {load_avg[2]:.2f}")
+
+    try:
+
+        total_percent = get_cpu_usage(interval=INFO_CPU_INTERVAL_S, per_CPU=False) 
+        print(f"Tổng % CPU sử dụng: {total_percent:.2f}%")
+
+        if total_percent >= args.threshold:
+             print(f"\033[91mCẢNH BÁO: Mức sử dụng CPU ({total_percent:.1f}%) vượt ngưỡng ({args.threshold}%)\033[0m")
