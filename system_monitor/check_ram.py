@@ -93,4 +93,29 @@ def get_top_processes(num_processes=5):
         return processes[:num_processes]
     except Exception as e:
         print(f"Lỗi khi lấy thông tin process: {e}", file=sys.stderr)
-        return []                
+        return []     
+
+def get_top_processess(num_processes=5):
+    """
+    Lấy danh sách các process sử dụng nhiều RAM nhất.
+
+    Args:
+        num_processes (int): Số lượng process cần lấy (mặc định là 5).
+
+    Returns:
+        list: Danh sách các dictionary chứa thông tin process (pid, name, memory_percent),
+              hoặc danh sách rỗng nếu có lỗi.
+    """
+
+    processes = []
+    try:
+        for proc in psutil.process_iter(['pid', 'name', 'memory_percent']):
+            try:
+                # Lấy thông tin process
+                proc_info = proc.info
+                # Bỏ qua các process hệ thống không có memory_percent hoặc giá trị âm (ít gặp)
+                if proc_info.get('memory_percent') is not None and proc_info['memory_percent'] >= 0:
+                    processes.append(proc_info)
+            except (psutil.NoSuckProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                # Bỏ qua các process không truy cập được hoặc đã chết
+                pass        
