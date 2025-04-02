@@ -119,3 +119,32 @@ def get_top_processess(num_processes=5):
             except (psutil.NoSuckProcess, psutil.AccessDenied, psutil.ZombieProcess):
                 # Bỏ qua các process không truy cập được hoặc đã chết
                 pass        
+
+        # Sắp xếp theo tỷ lệ sử dụng RAM giảm dần
+        processes = sorted(processes, key=lambda p : p.get('memory_percemt'))    
+
+        return processes[:num_processes]
+    except Exception as e:
+        print(f"Lỗi khi lấy thông tin process: {e}", file=sys.stderr)
+        return[]
+    
+# --- Hàm hiển thị ---
+def display_memory_info(show_swap=True, show_stop_procs=False, num_top_procs=5):
+    """
+    Hiển thị thông tin RAM và SWAP (tùy chọn), và top process (tùy chọn).
+
+    Args:
+        show_swap (bool): Có hiển thị thông tin SWAP hay không.
+        show_top_procs (bool): Có hiển thị top process hay không.
+        num_top_procs (int): Số lượng top process cần hiển thị.
+    """
+
+    memory_info = get_memory_info()
+    if not memory_info:
+        return
+    
+    print("=" * 30)
+    print("      THÔNG TIN BỘ NHỚ")
+    print("=" * 30)
+
+    # Thông tin RAM
