@@ -232,4 +232,23 @@ def display_memory_info(show_swap=True, show_stop_procs=False, num_top_procs=5):
                 print(f"\n\033[91mLỗi khi mở file log '{log_file}': {e}\033[0m", file=sys.stderr)
                 print("Giám sát sẽ tiếp tục mà không ghi log.")
                 log_handle = None # Đảm bảo không cố ghi vào file bị lỗi
+
+        alerts_ram_count = 0
+        alerts_swap_count = 0
+        try :
+            while time.time() < end_time:
+                mem_info = get_memory_info()
+                if not mem_info:
+                    time.sleep(interval)
+                    continue
+
+                ram = mem_info['ram']
+                swap = mem_info['swap']
+                timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+                ram_status = 'OK'
+                swap_status = 'OK'
+                is_alert = False
+                alert_messages = []
+                        
                         
