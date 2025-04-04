@@ -250,5 +250,53 @@ def display_memory_info(show_swap=True, show_stop_procs=False, num_top_procs=5):
                 swap_status = 'OK'
                 is_alert = False
                 alert_messages = []
+
+                # Kiểm tra ngưỡng RAM
+                if ram['percent'] >= ram_threshold:
+                    ram_status = f"\033[91mCẢNH BÁO ({ram['percent']:.1f}%)\033[0m"
+                    alerts_ram_count += 1
+                    is_alert = True
+                    alert_messages.append(f"RAM usage {ram['percent']:.1f}% >= {ram_threshold}%")
                         
-                        
+                # Kiểm tra ngưỡng SWAP (chỉ khi SWAP tồn tại)
+                if swap['total'] > 0 and swap['percent'] >= swap_threshold:
+                    swap_status = f"\033[93mCẢNH BÁO ({swap['percent']:.1f}%)\033[0m" # Màu vàng
+                    alerts_swap_count += 1
+                    is_alert = True
+                    alert_messages.append(f"SWAP usage {swap['percent']:.1f}% >= {swap_threshold}%")
+
+                # Tạo message log/print
+                # Hiển thị RAM: Used/Total (Percent) | SWAP: Used/Total (Percent) - Status    
+                ram_str = f"RAM: {get_size(ram['used'])}/{get_size(ram['total'])} ({ram['percent']:.1f}%)"
+                swap_str = f"SWAP: {get_size(swap['used'])}/{get_size(swap['total'])} ({swap['percent']:.1f}%)" if swap['total'] > 0 else "SWAP: N/A"
+                status_str = f"RAM: {ram_status}, SWAP: {swap_status}" if swap['total'] > 0 else f"RAM: {ram_status}"
+
+                message = f"[{timestamp}] {ram_str} | {swap_str} | Status: {status_str}"
+                print(message)
+
+                # Ghi log
+                if log_handle :
+                    log_ram_status = f"CẢNH BÁO ({ram['percent']:.1f}%)" if ram['percent'] >= ram_threshold else "OK"
+                    log_swap_status = f"CẢNH BÁO ({swap['percent']:.1f}%)" if swap['total'] > 0 and swap['percent'] >= swap_threshold else "OK"
+                    log_status_str = f"RAM: {log_ram_status}, SWAP: {log_swap_status}" if swap['total'] > 0 else f"RAM: {log_ram_status}"
+                    log_message = f"[{timestamp}] {ram_str} | {swap_str} | Status : { log_status_str}\n"
+                    log_handle.write(log_message)
+
+
+                # --- Bổ sung: Hiển thị top process khi có cảnh báo ---
+                if is_alert and show_procs_on_alert:
+                    top_processes = get_top_processes(num_top_procs)
+                    if top_processes:
+                        proc_alert_healer = f"  -> Top {len(top_processes)} process gây tải ({', '.join(alert_messages)}):"
+                        print(proc_alert_healer)
+                    if log_handle:
+                        log_handle.write(proc_alert_healer + "\n")
+                    for i, proc in enumerate(top_processes):
+                        proc_line = f"     {i+1}. {proc.get('name', 'N/A')} (PID: {proc.get('pid', 'N/A')}) - {proc.get('memory_percent', 0):.2f}% RAM"
+                        print(proc_line)
+                        if log_handle:
+                            log_handle.write(proc_line + "\n")
+                    else:
+                        print("> Không thể lấy thông tin process khi cảnh báo.")      
+                        if log_handle:
+                            log_handle.write("> Không thể lấy thông tin process khi cảnh báo.\n")
