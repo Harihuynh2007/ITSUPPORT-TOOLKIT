@@ -183,3 +183,39 @@ def monitor_disk(duration=DEFAULT_MONITOR_DURATION_SEC,
                     status = f"CẢNH BÁO (>={threshold}%)"
                     alerts += 1
                     log_level = logging.WARNING
+
+                usage_data.apped([
+                    disk["device"],
+                        disk["mountpoint"],
+                        f"{disk['percent']:.1f}%",
+                        get_size(disk['used']),
+                        get_size(disk['total']),
+                        status
+                ])    
+            if usage_data:
+                print("\n=== Tình trạng sử dụng ===")
+                print(tabulate(usage_data, headers=["Thiết bị", "Mountpoint", "% Used", "Đã dùng", "Tổng", "Trạng thái"], tablefmt="pretty"))
+            else:
+                logger.info("Không có phân vùng nào để hiển thị sau khi lọc.") 
+
+
+        current_io_stats = get_io_stats()
+        if current_io_stats and last_io_stats:
+            io_rate_data = []
+            for disk_name, current_stats in current_io_stats.items():
+                last_stats = last_io_stats[disk_name]
+                if last_stats:
+                    read_rate = (current_stats.read_bytes - last_stats.read_bytes) / time_delta
+                    write_rate = (current_stats.write_bytes - last_stats.write_bytes) / time_delta
+                    read_iops = (current_stats.read_count - last_stats.read_count) / time_delta
+                    write_iops = (current_stats.write_count - last_stats.write_count) / time_delta
+                    
+                    # Chỉ hiển thị nếu có hoạt động I/O đáng kể
+                    if read_rate > 1 or write_rate > 1 or read_iops > 0.1 or write_iops > 0.1:
+                            io_rate_data.append([
+                            disk_name,
+                            f"{get_size(read_rate)}/s",
+                            f"{read_iops:.1f}/s",
+                            f"{get_size(write_rate)}/s",
+                            f"{write_iops:.1f}/s"
+                        ])
