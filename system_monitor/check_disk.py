@@ -167,3 +167,19 @@ def monitor_disk(duration=DEFAULT_MONITOR_DURATION_SEC,
                     status = "Bình thường"
                     if disk["percent"] >= threshold:
                         status = f"CẢNH BÁO (>={threshold}%)"
+                        alerts += 1
+                        logger.warning(f"Mountpoint '{disk['mountpoint']}' ({disk['device']}) đạt {disk['percent']:.1f}% sử dụng.")
+                    else:
+                        logger.info(f"Mountpoint '{disk['mountpoint']}' ({disk['device']}): {disk['percent']:.1f}% - Used: {get_size(disk['used'])} / Total: {get_size(disk['total'])}")    
+                    break
+                if not found:
+                    logger.warning(f"Không tìm thấy thông tin cho mountpoint '{mountpoint}'. Có thể nó đã bị lọc hoặc không tồn tại.")
+        else:
+            usage_data = []
+            for disk in disk_info:
+                status = "ok"
+                log_level = logging.INFO
+                if disk['percent'] >= threshold:
+                    status = f"CẢNH BÁO (>={threshold}%)"
+                    alerts += 1
+                    log_level = logging.WARNING
