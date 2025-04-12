@@ -23,7 +23,7 @@ console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setFormatter(log_formatter)
 logger.addHandler(console_handler)
 
-file_handle = None
+file_handler = None
 
 def get_size(bytes_val, suffix = "B"):
     """
@@ -222,3 +222,28 @@ def monitor_disk(duration=DEFAULT_MONITOR_DURATION_SEC,
                             f"{get_size(write_rate)}/s",
                             f"{write_iops:.1f}/s"
                         ])
+
+                if io_rate_data:
+                    print("\n=== Tốc độ I/O (hiện tại) ===")
+                    print(tabulate(io_rate_data, headers=["Thiết bị", "Đọc", "Read IOPS", "Ghi", "Write IOPS"], tablefmt="pretty", floatfmt=".1f"))            
+
+
+            # Cập nhật trạng thái cho lần lặp sau
+            last_io_stats = current_io_stats
+            last_check_time = current_time
+
+            # Ngủ đến lần kiểm tra tiếp theo (trừ đi thời gian đã dùng để kiểm tra)
+            remaining_time = end_time - time.time()
+            sleep_time = max(0, min(interval - (time.time() - current_time), remaining_time))
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+
+    except KeyboardInterrupt :
+        logger.info("\nGiám sát bị dừng bởi người dùng.")    
+    finally:
+        summary = f"\nKết thúc giám sát ổ cứng. Tổng số cảnh báo dung lượng: {alerts}"
+        logger.info(summary)
+        if file_handler:
+            logger.removeHandler(file_handler)  
+            file_handler.close()
+                              
