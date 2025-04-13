@@ -246,4 +246,138 @@ def monitor_disk(duration=DEFAULT_MONITOR_DURATION_SEC,
         if file_handler:
             logger.removeHandler(file_handler)  
             file_handler.close()
-                              
+
+def find_large_files(path='.', top_n=DEFAULT_LARGE_FILES_COUNT, min_size_bytes=DEFAULT_LARGE_FILES_MIN_SIZE_MB * BYTES_PER_MB):
+    """
+        Tìm các file lớn trong đường dẫn chỉ định.
+
+        Args:
+            path (str): Đường dẫn cần tìm kiếm.
+            top_n (int): Số lượng file lớn nhất cần hiển thị.e
+            min_size_bytes (int): Kích thước tối thiểu (bytes).
+
+        Returns:
+            list: Danh sách các tuple (filepath, size) của các file lớn nhất.
+        """
+    large_files = []
+    logger.info(f"Bắt đầu tìm kiếm file lớn hơn {get_size(min_size_bytes)} trong '{path}'...")
+
+
+    for dirpath, dirnames, filenames in os.walk(path, topdown = True):
+        accessible_dirs = []
+        for d in list(dirnames):
+            dir_full_path = os.path.join(dirpath, d)
+            if not os.access(dir_full_path, os.R_OK | os.X_OK):
+                logger.warning(f"Không có quyền truy cập thư mục: {dir_full_path}. Bỏ qua.")
+                dirnames.remove(d)
+            else:
+                accessible_dirs.append(d)
+
+        for filename in filenames:
+            filepath = os.path.join(dirpath,filename)
+            try:
+                if not os.path.islink(filepath) and os.path.isfile(filepath):
+                    size = os.path.getsize(filepath)
+                    if size >= min_size_bytes:
+                        large_files.append((filepath, size)) 
+                        # Tối ưu: Nếu đã có nhiều hơn N file, so sánh và giữ lại top N
+                        if len(large_files) > top_n:
+                            large_files.sort(key=lambda x: x[1], reverse=True)
+                            large_files = large_files[:top_n]
+            except FileNotFoundError:
+                logger.debug(f"File {filepath} không tìm thấy (có thể đã bị xóa giữa chừng).")
+                continue # File có thể đã bị xóa giữa lúc liệt kê và getsize
+            except OSError as e:
+                logger.warning(f"Không thể lấy kích thước file '{filepath}': {e}. Bỏ qua.")
+                continue
+
+    large_files.sort(key = lambda x:x[1], reverse = True)
+    logger.info(f"Tìm kiếm hoàn tất. Tìm thấy {len(large_files)} file thỏa mãn.")
+    return large_files[:top_n]
+
+def display_disk_info(disk_info_list, show_io = False):
+    """Hiển thị thông tin ổ cứng và I/O dưới dạng bảng."""
+    if not disk_info_list:
+        logger.info("Không có thông tin ổ cứng nào để hiển thị (có thể đã bị lọc hết).")
+        return
+
+    print("\n=== THÔNG TIN SỬ DỤNG Ổ CỨNG ===")
+    disk_data = []
+    warnings = []
+    for disk in disk_info_list:
+        disk_data.append({
+            disk["device"],
+            disk["mountpoint"],
+            disk["fstype"],
+            get_size(disk["total"]),
+            get_size(disk["used"]),
+            get_size(disk["free"]),
+            f"{disk['percent']:.1f}%"
+        })        
+        if disk["percent"] >= DEFAULT_THRESHOLD_PERCENT:
+            warnings.append(f"CẢNH BÁO: Ổ đĩa {disk['device']} ({disk['mountpoint']}) đang sử dụng {disk['percent']:.1f}% dung lượng!")
+
+    print(tabulate(disk_data,
+                    headers=["Thiết bị", "Mountpoint", "Hệ thống file", "Tổng", "Đã dùng", "Còn trống", "% Used"],
+                    tablefmt="pretty")) # "grid" hoặc "pretty"
+
+    if warnings:
+        print("\n--- Cảnh báo dung lượng ---")
+        for warn in warnings:
+            print(warn)
+
+    if show_io:
+        io_stats = get_io_stats()
+
+        if io_stats:
+            print("\n=== THÔNG TIN I/O ===")
+            io_data= []
+            for disk_name, stats in io_stats.items():
+                is_relevant = any(disk_name in d['device'] for d in disk_info_list) if disk_info_list else True
+                if is_relevant: # Chỉ hiển thị I/O cho các disk có thể liên quan
+                    io_data.append([
+                        disk_name,
+                        get_size(stats.read_bytes),
+                        f"{stats.read_count:,}", # Định dạng số lớn
+                            get_size(stats.write_bytes),
+                            f"{stats.write_count:,}"
+                    ])
+            if io_data:
+                print(tabulate(io_data,
+                              headers=["Thiết bị", "Tổng Bytes đọc", "Số lần đọc", "Tổng Bytes ghi", "Số lần ghi"],
+                              tablefmt="pretty", floatfmt=",.0f")) # floatfmt để định dạng số lần đọc/ghi
+            else:
+                print("Không có dữ liệu I/O phù hợp với các phân vùng đã hiển thị.")
+        else:
+            print("\nKhông thể lấy thông tin I/O.")
+
+
+def display_large_files(large_files_list):
+    """Hiển thị danh sách file lớn dưới dạng bảng."""
+    if not large_files_list:
+        logger.info("Không tìm thấy file lớn nào thỏa mãn điều kiện.")
+        return
+    
+    print(f"\n=== TOP {len(large_files_list)} FILE LỚN NHẤT ===")
+    file_data = []
+    for filepath, size in large_files_list:
+        try:
+            # Sử dụng stat để lấy mtime chính xác hơn và kiểm tra file còn tồn tại
+            stat_result = os.stat(filepath)
+                modified_time = datetime.datetime.fromtimestamp(stat_result.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+        except FileNotFoundError:
+            modified_time = "Đã xóa?"
+        except OSError as e:
+            logger.warning(f"Không thể lấy thời gian sửa đổi cho {filepath}: {e}")
+            modified_time = "Lỗi khi đọc"    
+
+
+
+
+                
+
+
+
+
+    
+
