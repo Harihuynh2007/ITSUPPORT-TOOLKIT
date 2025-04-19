@@ -145,3 +145,54 @@ def get_network_connections():
                     except psutil.ZombieProcess:
                         process_name ="Zombie Process"
 
+            remote_addr_str = "N/A"
+            if conn.raddr and conn.raddr.ip and conn.raddr.port:
+                remote_addr_str = f"{conn.raddr.ip}:{conn.raddr.port}"
+
+            connections.append({
+                "local_addr": f"{conn.laddr.ip}:{conn.laddr.port}",
+                "remote_addr": remote_addr_str,
+                "status": conn.status, # Luon la ESTABLISHED o day
+                "process": process_name,
+                "pid": conn.pid if conn.pid else "N/A"
+            })    
+    except psutil.AccessDenied:
+        print("Loi: Khong co quyen truy cap thong tin ket noi mang (can chay voi quyen admin/root?).")
+    except Exception as e:
+        print(f"Loi khi lay thong tin ket noi mang: {e}")
+    return connections
+
+def get_open_ports(host='127.0.0.1', start_port=1, end_port=1024, timeout=0.2):
+    """
+    Kiem tra cac cong TCP mo tren mot host (mac dinh la localhost).
+    Tang timeout de giam kha nang bao loi sai (false negative).
+    """
+    open_ports = []
+
+    for port in range(start_port, end_port + 1):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        result = sock.connect_ex((host, port))
+        if result == 0:
+            try:
+                service = socket.getservbyport(port, 'tcp')
+            except (OSError, socket.error):
+                service = "unknown"
+            open_ports.append((port, service))
+        sock.close()
+    return open_ports
+
+def format_bytes(b):
+    """Chuyen doi bytes thanh don vi doc duoc (KB, MB, GB)"""
+    if b is None : return 'N/A'
+    try:
+        b = float(b)
+        if b < 0: 
+            return "N/A"
+            for unit in ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']:
+                if abs(b) < 1024.0:
+                    return f"{b:3.2f} {unit}"
+                b /= 1024.0
+            return f"{b:.2f} YB"
+    except (ValueError, TypeError):
+        return "N/A"    
