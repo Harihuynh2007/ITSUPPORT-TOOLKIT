@@ -196,3 +196,53 @@ def format_bytes(b):
             return f"{b:.2f} YB"
     except (ValueError, TypeError):
         return "N/A"    
+    
+def print_separator(char = "=", length = 50):
+    print(char *length)
+
+def main():
+    print_separator()
+    print("CONG CU KIEM TRA MANG")
+    print_separator()
+
+    now = datetime.now()
+    print(f"Thoi gian kiem tra: {now.strftime('%Y-%m-%d %H:%M:%S')}")
+
+    print("\n--- 1. Kiem tra ket noi Internet ---")
+    if check_connection():
+        print("   [✓] Ket noi Internet: Thanh cong (kiem tra qua Google DNS)")
+
+        print("\n--- 2. Thong so Ping (toi 8.8.8.8) ---")
+        ping_result = get_ping_stats()
+        if ping_result:
+            if "error" in ping_result:
+                print(f"   [✗] Loi Ping: {ping_result['error']}")
+            elif "raw_output" in ping_result:
+                print(f"   [!] Khong the phan tich chi tiet output ping. Output tho:")
+                print(f"     {ping_result['raw_output']}")    
+            else:
+                print(f"   [✓] Ping toi {ping_result['host']}:")
+                print(f"       - Thoi gian phan hoi (RTT): Min={ping_result.get('min_rtt', 'N/A')}ms, Avg={ping_result.get('avg_rtt', 'N/A')}ms, Max={ping_result.get('max_rtt', 'N/A')}ms")
+                print(f"       - Goi tin: Gui={ping_result.get('packets_sent', 'N/A')}, Nhan={ping_result.get('packets_received', 'N/A')}, Mat={ping_result.get('packets_lost', 'N/A')} ({ping_result.get('packet_loss_percent', 'N/A')}%)")
+        else:
+            print("   [✗] Khong nhan duoc ket qua ping.")  
+    else:
+        print("   [✗] Ket noi Internet: That bai")
+        print("\n--- 2. Thong so Ping ---")
+        print("   [!] Bo qua kiem tra ping do khong co ket noi Internet.")
+
+
+    # 3. Thong tin ve giao dien mang
+    print("\n--- 3. Giao dien mang ---")
+    interfaces = get_network_interfaces
+    if interfaces:
+        for interface,addresses in interfaces.items():
+            # In ten interface noi bat hon
+            print(f"\n   Interface: {interface}")
+            if addresses:
+                for addr in addresses:
+                    print(f"     - {addr}")
+            else:
+                print("     (Khong co dia chi IP duoc cau hinh)")
+    else:
+        print("   [!] Khong the lay thong tin giao dien mang.")
